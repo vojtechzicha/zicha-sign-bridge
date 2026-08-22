@@ -43,6 +43,9 @@ public struct Response: Encodable, Sendable {
     public var `protocol`: Int?
     public var hostVersion: String?
     public var paired: Bool?
+    /// Set on a frame that is news rather than an answer — see protocol.md.
+    /// A request is finished by the first frame WITHOUT this.
+    public var event: String?
     public var tokens: [TokenInfo]?
     public var certificates: [TokenCertificate]?
     public var signature: String?

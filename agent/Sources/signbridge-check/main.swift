@@ -257,10 +257,46 @@ do {
     checks.equal(unpairedList?.code, ErrorCode.notPaired.rawValue, "and is told to pair")
 }
 
+// The dialog layer, which is where consent is actually read.
+//
+// Checked because it got this wrong. `osascript display dialog` exits 0 for
+// every button it defines — only one literally named "Cancel" raises an error —
+// so reading the exit status as consent made "Refuse" indistinguishable from
+// "Approve", and refusing a pairing paired the origin anyway. The answers below
+// are the literal strings osascript produces.
+checks.section("Consent parsing")
+
+checks.equal(
+    DialogConsent.approved("button returned:Approve\n"), true,
+    "the approve button approves"
+)
+checks.equal(
+    DialogConsent.approved("button returned:Refuse\n"), false,
+    "and the refuse button does NOT — the bug this exists for"
+)
+checks.equal(DialogConsent.approved(nil), false, "a dialog that could not run is a refusal")
+checks.equal(DialogConsent.approved(""), false, "and so is an empty answer")
+
+checks.equal(
+    DialogConsent.pin("button returned:Sign, text returned:123456\n"), "123456",
+    "the PIN is read from a confirmed dialog"
+)
+checks.equal(
+    DialogConsent.pin("button returned:Cancel, text returned:123456\n"), nil,
+    "and a cancelled one yields no PIN even though it typed one"
+)
+// A PIN is free text and may contain the separator, so the tail is taken whole.
+checks.equal(
+    DialogConsent.pin("button returned:Sign, text returned:12,34\n"), "12,34",
+    "a PIN containing a comma survives"
+)
+checks.equal(DialogConsent.pin(nil), nil, "no answer means no PIN")
+
 do {
     let (handler, consent) = makeHandler(approvePair: false)
     let refused = handler.handle(request("pair"))
     checks.equal(refused.count, 2, "pair answers twice: the code, then the outcome")
+    checks.equal(refused.first?.event, "pairing-code", "the first frame is news, not the answer")
     checks.ok(refused.first?.code?.count == 4, "the pairing code is four characters")
     checks.ok(
         !(refused.first?.code ?? "").contains(where: { "O0I1".contains($0) }),
@@ -271,6 +307,11 @@ do {
 
     let stillUnpaired = handler.handle(request("listCertificates")).first
     checks.equal(stillUnpaired?.code, ErrorCode.notPaired.rawValue, "and leaves the origin unpaired")
+
+    // The consequence that made the bug matter: a refused pairing must not
+    // leave anything behind that a later request can use.
+    let stillUnpairedHello = handler.handle(request("hello")).first
+    checks.equal(stillUnpairedHello?.paired, false, "and hello still reports the origin unpaired")
 }
 
 do {

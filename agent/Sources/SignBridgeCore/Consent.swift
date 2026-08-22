@@ -22,16 +22,46 @@ public protocol Consent: Sendable {
 /// enough to prove the wire and to keep the PIN out of the browser, which are
 /// the two properties that matter before the real window exists.
 public struct DialogConsent: Consent {
+    /// Button labels, named once because the answer is matched against them.
+    /// A label changed in the dialog and not here reads every click as a
+    /// refusal — which fails safe, but silently.
+    enum Buttons {
+        static let approve = "Approve"
+        static let sign = "Sign"
+    }
+
     public init() {}
 
     public func approvePairing(origin: String, code: String) -> Bool {
         let message =
             "\(origin) is asking to use your signing token.\n\n"
             + "Approve only if the page shows this code:\n\n\t\(code)"
-        return runOsascript(
+        let result = runOsascript(
             "display dialog \(quote(message)) with title \"Sign Bridge\" "
-                + "buttons {\"Refuse\", \"Approve\"} default button \"Refuse\" with icon caution"
-        ) != nil
+                + "buttons {\"Refuse\", \"\(Buttons.approve)\"} default button \"Refuse\" with icon caution"
+        )
+        return DialogConsent.approved(result)
+    }
+
+    /// Whether an `osascript display dialog` answer means the approve button.
+    ///
+    /// Split out and made static so it can be checked without a dialog, which
+    /// it needs to be: this got it wrong. `display dialog` exits 0 for every
+    /// button it defines — only one literally named "Cancel" raises an error —
+    /// so reading the exit status as consent treats "Refuse" as approval. It
+    /// did, and a refused pairing paired the origin.
+    public static func approved(_ answer: String?) -> Bool {
+        answer?.contains("button returned:\(Buttons.approve)") ?? false
+    }
+
+    /// The PIN out of an answer, or nil if the dialog was not confirmed.
+    ///
+    /// The answer is "button returned:Sign, text returned:1234" — and a PIN may
+    /// itself contain a comma, so the tail is taken whole rather than split.
+    public static func pin(_ answer: String?) -> String? {
+        guard let answer, answer.contains("button returned:\(Buttons.sign)") else { return nil }
+        guard let range = answer.range(of: "text returned:") else { return nil }
+        return String(answer[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     public func approveSignature(origin: String, context: SignContext, tokenLabel: String) -> String? {
@@ -46,12 +76,9 @@ public struct DialogConsent: Consent {
         let result = runOsascript(
             "display dialog \(quote(message)) with title \"Sign Bridge\" "
                 + "default answer \"\" with hidden answer "
-                + "buttons {\"Cancel\", \"Sign\"} default button \"Sign\" with icon caution"
+                + "buttons {\"Cancel\", \"\(Buttons.sign)\"} default button \"\(Buttons.sign)\" with icon caution"
         )
-        guard let result else { return nil }
-        // `display dialog` answers "button returned:Sign, text returned:1234".
-        guard let range = result.range(of: "text returned:") else { return nil }
-        return String(result[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return DialogConsent.pin(result)
     }
 
     /// nil when the user cancelled or the dialog could not be shown. A refusal

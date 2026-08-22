@@ -41,12 +41,19 @@ must never have a side effect, because the page calls it unprompted.
 { "id": "2", "type": "pair" }
 ```
 ```json
-{ "id": "2", "ok": true, "code": "K7F2" }
+{ "id": "2", "ok": true, "event": "pairing-code", "code": "K7F2" }
 ```
 
 The host displays the same four characters and waits. On approval it records the
-origin and answers a second frame `{"id":"2","ok":true,"paired":true}`; on
+origin and answers a final frame `{"id":"2","ok":true,"paired":true}`; on
 refusal, `{"ok":false,"code":"refused"}`.
+
+**A frame carrying `event` is not the answer.** It is news from a request still
+in progress, and the code has to reach the page while the host's window is still
+on screen — which is the entire point of a code. That is why the page connects
+with `chrome.runtime.connect` and not `sendMessage`: a single request/response
+call cannot deliver anything before the request finishes, so the code would
+arrive after the window it was meant to be compared against had gone.
 
 The code exists so the person can tell that the window in front of them belongs
 to the page in front of them. It is not a secret and not a password.

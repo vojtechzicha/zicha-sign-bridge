@@ -89,6 +89,7 @@ public struct RequestHandler {
         let code = String((0..<4).map { _ in alphabet[Int.random(in: 0..<alphabet.count)] })
 
         var shown = Response.ok(request.id)
+        shown.event = "pairing-code"
         shown.code = code
 
         let approved = consent.approvePairing(origin: origin, code: code)
