@@ -1,0 +1,4 @@
+module CPKCS11 {
+    header "cpkcs11.h"
+    export *
+}

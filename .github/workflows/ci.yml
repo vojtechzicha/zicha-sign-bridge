@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  agent:
+    # The agent is macOS-only by design (see README), so there is nowhere else
+    # to build it. A hosted runner also gives a real Security.framework, which
+    # is what verifies the signatures the checks produce.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install SoftHSM and the PKCS #11 tools
+        # SoftHSM is the test token: a real PKCS #11 module, so the same
+        # C_Login / C_Sign / attribute rules as the card, with no card.
+        run: brew install softhsm opensc
+
+      - name: Build a throwaway token
+        # The script prints KEY=VALUE lines, which is exactly what GITHUB_ENV
+        # wants — so the token's location and PIN reach the checks without
+        # being written down anywhere.
+        run: ./scripts/softhsm-token.sh "$RUNNER_TEMP/softhsm" >> "$GITHUB_ENV"
+
+      - name: Build
+        working-directory: agent
+        run: swift build
+
+      - name: Check
+        working-directory: agent
+        run: swift run signbridge-check
+
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build and check the extension
+        working-directory: extension
+        run: |
+          npm ci
+          npm run check

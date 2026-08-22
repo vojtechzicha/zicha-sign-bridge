@@ -1,0 +1,16 @@
+.build/
+.swiftpm/
+.DS_Store
+*.xcodeproj
+
+# Local SoftHSM tokens — scripts/softhsm-token.sh makes one on demand, and a
+# committed token would be a committed private key.
+/tokens/
+softhsm2.conf
+
+# Extension build output and anything carrying the signing identity.
+extension/dist/
+*.p12
+*.crx
+*.pem
+!packaging/**/*.pem
