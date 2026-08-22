@@ -293,6 +293,45 @@ checks.equal(
 checks.equal(DialogConsent.pin(nil), nil, "no answer means no PIN")
 
 do {
+    // The ordering, which is the whole reason `handle` emits through a callback.
+    // The code has to be on the wire BEFORE the window opens, because the only
+    // thing it is for is being compared against that window. Collecting frames
+    // and returning them at the end delivers it once the window has already
+    // been dismissed — which is what it did, and looked exactly like sending
+    // no code at all.
+    final class OrderRecordingConsent: Consent, @unchecked Sendable {
+        private(set) var framesBeforeWindow = -1
+        let framesSoFar: () -> Int
+
+        init(framesSoFar: @escaping () -> Int) { self.framesSoFar = framesSoFar }
+
+        func approvePairing(origin: String, code: String) -> Bool {
+            framesBeforeWindow = framesSoFar()
+            return false
+        }
+
+        func approveSignature(origin: String, context: SignContext, tokenLabel: String) -> String? {
+            nil
+        }
+    }
+
+    var emitted: [Response] = []
+    let ordering = OrderRecordingConsent(framesSoFar: { emitted.count })
+    let orderingHandler = RequestHandler(
+        service: { service }, consent: ordering,
+        pairings: PairingStore(url: pairingsFile)
+    )
+    orderingHandler.handle(request("pair", origin: "https://ordering.test")) { emitted.append($0) }
+
+    checks.equal(
+        ordering.framesBeforeWindow, 1,
+        "the pairing code reaches the page BEFORE the window it is compared against opens"
+    )
+    checks.equal(emitted.first?.event, "pairing-code", "and that first frame is the code")
+    checks.equal(emitted.count, 2, "with the outcome following once the window is answered")
+}
+
+do {
     let (handler, consent) = makeHandler(approvePair: false)
     let refused = handler.handle(request("pair"))
     checks.equal(refused.count, 2, "pair answers twice: the code, then the outcome")

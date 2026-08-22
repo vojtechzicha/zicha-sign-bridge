@@ -23,9 +23,26 @@ public struct RequestHandler {
         self.pairings = pairings
     }
 
-    /// Handle one request. Returns every frame to send, in order — `pair` is
-    /// the only operation that answers twice.
+    /// Handle one request, emitting frames AS THEY HAPPEN.
+    ///
+    /// A callback rather than a returned array, and that is the whole point:
+    /// `pair` has to put its code on the wire *before* it blocks on a window
+    /// the person has to compare that code against. Collecting frames and
+    /// returning them at the end delivers the code once the window has already
+    /// been dismissed, which is exactly as useless as sending nothing.
+    public func handle(_ request: Request, emit: (Response) -> Void) {
+        for response in respond(request, emit: emit) { emit(response) }
+    }
+
+    /// Collected form, for checks that want to assert over the whole exchange.
     public func handle(_ request: Request) -> [Response] {
+        var frames: [Response] = []
+        handle(request) { frames.append($0) }
+        return frames
+    }
+
+    /// Frames still to emit after any emitted mid-flight.
+    private func respond(_ request: Request, emit: (Response) -> Void) -> [Response] {
         // The origin is attached by the extension from what the browser told
         // it. Its absence means the request did not come through the
         // extension, which is not a case to be lenient about.
@@ -37,7 +54,7 @@ public struct RequestHandler {
         case "hello":
             return [hello(request, origin: origin)]
         case "pair":
-            return pair(request, origin: origin)
+            return pair(request, origin: origin, emit: emit)
         case "listCertificates":
             return [requirePairing(request, origin: origin) ?? listCertificates(request)]
         case "sign":
@@ -77,7 +94,7 @@ public struct RequestHandler {
         return response
     }
 
-    private func pair(_ request: Request, origin: String) -> [Response] {
+    private func pair(_ request: Request, origin: String, emit: (Response) -> Void) -> [Response] {
         if pairings.isPaired(origin) {
             var already = Response.ok(request.id)
             already.paired = true
@@ -88,19 +105,18 @@ public struct RequestHandler {
         let alphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
         let code = String((0..<4).map { _ in alphabet[Int.random(in: 0..<alphabet.count)] })
 
+        // Emitted before the window opens, not after it closes.
         var shown = Response.ok(request.id)
         shown.event = "pairing-code"
         shown.code = code
+        emit(shown)
 
         let approved = consent.approvePairing(origin: origin, code: code)
         if approved { pairings.approve(origin) }
 
         var result = Response.ok(request.id)
         result.paired = approved
-        return [
-            shown,
-            approved ? result : .failure(request.id, .refused, "The pairing was refused."),
-        ]
+        return [approved ? result : .failure(request.id, .refused, "The pairing was refused.")]
     }
 
     private func listCertificates(_ request: Request) -> Response {

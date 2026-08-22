@@ -67,23 +67,30 @@ while true {
     // process ends.
     guard let message else { break }
 
-    let responses: [Response]
+    let request: Request
     do {
-        responses = handler.handle(try decoder.decode(Request.self, from: message))
+        request = try decoder.decode(Request.self, from: message)
     } catch {
-        // Undecodable input still gets an answer, because the page is waiting
-        // on an id it will never see otherwise. Without the id there is
-        // nothing to answer, so the frame is dropped and logged.
+        // Undecodable input still deserves an answer, because the page is
+        // waiting on an id it will otherwise never see. Without the id there
+        // is nothing to answer, so the frame is dropped and logged.
         FileHandle.standardError.write(Data("undecodable request: \(error)\n".utf8))
         continue
     }
 
-    for response in responses {
+    // Written as they are produced rather than collected first: `pair` puts its
+    // code on the wire and only then opens the window that code is meant to be
+    // compared against, and a frame held back until the handler returns arrives
+    // after that window has gone.
+    var writeFailed = false
+    handler.handle(request) { response in
+        guard !writeFailed else { return }
         do {
             try channel.write(try encoder.encode(response))
         } catch {
             FileHandle.standardError.write(Data("write failed: \(error)\n".utf8))
-            exit(1)
+            writeFailed = true
         }
     }
+    if writeFailed { exit(1) }
 }
