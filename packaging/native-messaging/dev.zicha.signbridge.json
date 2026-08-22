@@ -1,0 +1,9 @@
+{
+  "name": "dev.zicha.signbridge",
+  "description": "Sign Bridge native host — PKCS#11 signing for track.zicha.dev",
+  "path": "/Applications/SignBridge.app/Contents/MacOS/signbridge-host",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://jeiiaokfpmlldaebepnpppjjlhhangje/"
+  ]
+}

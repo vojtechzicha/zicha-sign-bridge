@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Sign Bridge",
+  "version": "0.1.0",
+  "description": "Lets track.zicha.dev sign PDFs with the qualified certificate on your hardware token.",
+  "minimum_chrome_version": "116",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5DjlADFwwDeOp+kYJR5DWHvfpvy4ykWStzOCR6GeYRCiCY06tl70i2KjOEp/L5rf+o6TswaSqBlk6SwIZngDjJC84FCnc6jxpNjX1Rz7hUsi1patCkjOg5SwHsriSfQLuMuJdOjnFwbzlOkBA6+gWNsw4WNuLBLhSyc9WHScO0Tdpl1hgx83tZyK1/aZX6LRAmfNHzUgwncyDhipWS5pqc8dewMODC62XnfV3J6td5BTu/m0mqR6K19y0C8oXuT9S8kmT2gY9ClGWtYBuUjFiWOZtpKa8m+bqXztKelMogDM1kyMvaNMN7ski7/w9Qod2ZeslGAOMq0rdBxtxYfuewIDAQAB",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "nativeMessaging"
+  ],
+  "externally_connectable": {
+    "matches": [
+      "https://track.zicha.dev/*",
+      "https://beta.track.zicha.dev/*",
+      "http://localhost/*",
+      "http://127.0.0.1/*"
+    ]
+  },
+  "icons": {
+    "128": "icon128.png"
+  }
+}

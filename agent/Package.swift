@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v13)],
     products: [
         .library(name: "SignBridgeCore", targets: ["SignBridgeCore"]),
+        .executable(name: "signbridge-host", targets: ["signbridge-host"]),
         .executable(name: "signbridge-check", targets: ["signbridge-check"]),
     ],
     targets: [
@@ -21,6 +22,9 @@ let package = Package(
         // nothing but the toolchain, runs identically on a laptop and on a CI
         // runner, and matches how the web app this serves states its own
         // results ("✓ 103 signature checks passed").
+        // What Chrome launches. Deliberately thin: everything it decides
+        // lives in SignBridgeCore, where the checks can reach it.
+        .executableTarget(name: "signbridge-host", dependencies: ["SignBridgeCore"]),
         .executableTarget(name: "signbridge-check", dependencies: ["SignBridgeCore"]),
     ]
 )

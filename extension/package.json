@@ -1,0 +1,16 @@
+{
+  "name": "sign-bridge-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/background.ts --bundle --format=esm --target=chrome116 --outfile=dist/background.js && cp manifest.json dist/ && cp icon128.png dist/",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && node scripts/check-manifest.mjs"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}

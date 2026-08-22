@@ -177,4 +177,175 @@ if let certificate = signable.first {
     checks.skip("the signing checks — no certificate on this token has a private key")
 }
 
+// MARK: - The protocol
+//
+// RequestHandler decides who may do what, so it is checked directly rather than
+// through Chrome: the rules have to hold whatever the transport is, and driving
+// a browser to assert "unpaired origins are refused" would test the browser.
+
+checks.section("Protocol")
+
+// Consent that answers without a person, so these run headless. It also records
+// what it was asked, which is how "the PIN was never requested" gets asserted.
+final class ScriptedConsent: Consent, @unchecked Sendable {
+    let pin: String?
+    let approvePair: Bool
+    private(set) var pairingsAsked: [String] = []
+    private(set) var signaturesAsked: [SignContext] = []
+
+    init(pin: String?, approvePair: Bool) {
+        self.pin = pin
+        self.approvePair = approvePair
+    }
+
+    func approvePairing(origin: String, code: String) -> Bool {
+        pairingsAsked.append(code)
+        return approvePair
+    }
+
+    func approveSignature(origin: String, context: SignContext, tokenLabel: String) -> String? {
+        signaturesAsked.append(context)
+        return pin
+    }
+}
+
+let pairingsFile = URL(fileURLWithPath: NSTemporaryDirectory())
+    .appendingPathComponent("signbridge-check-\(UUID().uuidString).json")
+defer { try? FileManager.default.removeItem(at: pairingsFile) }
+
+func makeHandler(pin: String? = nil, approvePair: Bool = true) -> (RequestHandler, ScriptedConsent) {
+    let consent = ScriptedConsent(pin: pin, approvePair: approvePair)
+    return (
+        RequestHandler(
+            service: { service }, consent: consent,
+            pairings: PairingStore(url: pairingsFile)
+        ),
+        consent
+    )
+}
+
+func request(_ type: String, id: String = "1", origin: String? = "https://example.test", extra: [String: Any] = [:]) -> Request {
+    var body: [String: Any] = ["id": id, "type": type]
+    if let origin { body["origin"] = origin }
+    body.merge(extra) { _, new in new }
+    let data = try! JSONSerialization.data(withJSONObject: body)
+    return try! JSONDecoder().decode(Request.self, from: data)
+}
+
+do {
+    let (handler, _) = makeHandler()
+
+    // A request with no origin did not come through the extension. Being
+    // lenient here would make pairing decorative.
+    let anonymous = handler.handle(request("hello", origin: nil))
+    checks.equal(anonymous.first?.ok, false, "a request without an origin is refused")
+
+    // hello answers before pairing — it is how the page discovers the helper.
+    let hello = handler.handle(request("hello")).first
+    checks.equal(hello?.ok, true, "hello is answered without pairing")
+    checks.equal(hello?.protocol, SignBridgeProtocol.version, "hello reports the protocol version")
+    checks.equal(hello?.paired, false, "and says the origin is not paired yet")
+    checks.ok(hello?.tokens?.isEmpty == false, "and lists the token it can see")
+
+    let futureProtocol = handler.handle(request("hello", extra: ["protocol": 99])).first
+    checks.equal(futureProtocol?.ok, false, "a protocol this host does not speak is refused")
+    checks.equal(futureProtocol?.code, ErrorCode.unsupportedProtocol.rawValue, "and says so specifically")
+
+    // Everything else needs pairing first.
+    let unpairedList = handler.handle(request("listCertificates")).first
+    checks.equal(unpairedList?.ok, false, "an unpaired origin cannot list certificates")
+    checks.equal(unpairedList?.code, ErrorCode.notPaired.rawValue, "and is told to pair")
+}
+
+do {
+    let (handler, consent) = makeHandler(approvePair: false)
+    let refused = handler.handle(request("pair"))
+    checks.equal(refused.count, 2, "pair answers twice: the code, then the outcome")
+    checks.ok(refused.first?.code?.count == 4, "the pairing code is four characters")
+    checks.ok(
+        !(refused.first?.code ?? "").contains(where: { "O0I1".contains($0) }),
+        "and avoids characters that are read wrong by eye"
+    )
+    checks.equal(refused.last?.ok, false, "a refused pairing does not pair")
+    checks.equal(consent.pairingsAsked.count, 1, "the person was asked exactly once")
+
+    let stillUnpaired = handler.handle(request("listCertificates")).first
+    checks.equal(stillUnpaired?.code, ErrorCode.notPaired.rawValue, "and leaves the origin unpaired")
+}
+
+do {
+    let (handler, _) = makeHandler(pin: pin)
+    let paired = handler.handle(request("pair"))
+    checks.equal(paired.last?.paired, true, "an approved pairing pairs")
+
+    let listed = handler.handle(request("listCertificates")).first
+    checks.equal(listed?.ok, true, "a paired origin lists certificates")
+    checks.equal(
+        listed?.certificates?.count, certificates.count,
+        "and gets the same certificates the service reports"
+    )
+
+    // A signature with no context has nothing truthful to show, so it is
+    // refused rather than shown an empty window.
+    let contextless = handler.handle(
+        request("sign", extra: ["certificateId": "x:01", "data": "AA=="])
+    ).first
+    checks.equal(contextless?.ok, false, "signing without a context is refused")
+    checks.equal(contextless?.code, ErrorCode.badRequest.rawValue, "as a bad request")
+}
+
+if let signableCertificate = signable.first {
+    let (handler, consent) = makeHandler(pin: pin)
+    _ = handler.handle(request("pair"))
+
+    let payload = Array("protocol round trip".utf8)
+    let context: [String: Any] = [
+        "documentName": "Timesheet 2026-08.pdf",
+        "digest": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    ]
+    let signed = handler.handle(
+        request(
+            "sign",
+            extra: [
+                "certificateId": signableCertificate.id,
+                "hash": "SHA-256",
+                "data": Data(payload).base64EncodedString(),
+                "context": context,
+            ]
+        )
+    ).first
+
+    checks.equal(signed?.ok, true, "a paired origin with a PIN gets a signature")
+    checks.equal(consent.signaturesAsked.count, 1, "and the person was shown exactly one confirmation")
+    checks.equal(
+        consent.signaturesAsked.first?.documentName, "Timesheet 2026-08.pdf",
+        "showing the document the page named"
+    )
+    // The signature must be the same one the direct API produces — the
+    // protocol layer is a transport, and a transport that transforms the bytes
+    // is a bug that only shows up in a validator.
+    if let encoded = signed?.signature, let bytes = Data(base64Encoded: encoded) {
+        checks.equal(bytes.count, 256, "the signature crosses the wire as base64 of the raw bytes")
+    } else {
+        checks.ok(false, "the signature came back base64-encoded")
+    }
+
+    // Refusal must not produce a signature, however well-formed the request.
+    let (refusingHandler, _) = makeHandler(pin: nil)
+    _ = refusingHandler.handle(request("pair"))
+    let refusedSignature = refusingHandler.handle(
+        request(
+            "sign",
+            extra: [
+                "certificateId": signableCertificate.id,
+                "data": Data(payload).base64EncodedString(),
+                "context": context,
+            ]
+        )
+    ).first
+    checks.equal(refusedSignature?.ok, false, "cancelling the PIN prompt refuses the signature")
+    checks.equal(refusedSignature?.code, ErrorCode.refused.rawValue, "and says it was refused")
+    checks.ok(refusedSignature?.signature == nil, "and returns nothing that could be mistaken for one")
+}
+
 checks.finish("agent checks")
