@@ -53,7 +53,7 @@ if [ $STATUS -ne 0 ] || ! grep -q "status: Accepted" <<<"$OUTPUT"; then
   say "ERROR  notarization did not come back Accepted."
   ID="$(grep -m1 -o '  id: [0-9a-f-]\{36\}' <<<"$OUTPUT" | awk '{print $2}' || true)"
   if [ -n "${ID:-}" ]; then
-    say "fetching the log for $ID…"
+    say "fetching the log for ${ID}…"
     xcrun notarytool log "$ID" --key "$KEY" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" || true
   fi
   exit 1

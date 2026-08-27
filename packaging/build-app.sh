@@ -53,7 +53,7 @@ fi
 # which is also what makes the entitlements file mean anything: without it,
 # library validation is not enforced and disable-library-validation is inert.
 # --timestamp is required for notarization; a signature without one is rejected.
-say "signing with $SIGN_IDENTITY…"
+say "signing with ${SIGN_IDENTITY}…"
 codesign --force --sign "$SIGN_IDENTITY" \
     --options runtime \
     --timestamp \

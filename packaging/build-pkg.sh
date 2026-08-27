@@ -72,7 +72,7 @@ cat > "$DIST" <<XML
 XML
 
 if [ -n "${INSTALLER_IDENTITY:-}" ]; then
-    say "signing the installer with $INSTALLER_IDENTITY…"
+    say "signing the installer with ${INSTALLER_IDENTITY}…"
     productbuild --distribution "$DIST" --package-path "$OUT" \
         --sign "$INSTALLER_IDENTITY" --timestamp "$PKG"
     pkgutil --check-signature "$PKG" | head -3

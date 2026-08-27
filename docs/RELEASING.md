@@ -35,6 +35,26 @@ Create both at [developer.apple.com/account/resources/certificates](https://deve
 then export them together from Keychain Access as one `.p12` (select both, right
 click → Export 2 items), with a password.
 
+> **If `security find-identity -v` says `0 valid identities found`** with the
+> certificates plainly in the keychain, the missing piece is almost certainly
+> Apple's intermediate, not your certificate. Run `security find-identity`
+> without `-v`: identities listed as `CSSMERR_TP_NOT_TRUSTED` are correctly
+> paired with their keys and simply cannot build a chain. Fix it with
+>
+> ```bash
+> curl -O https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+> security import DeveloperIDG2CA.cer -k ~/Library/Keychains/login.keychain-db
+> ```
+>
+> (Check the issuer on your own certificate first — `openssl x509 -noout
+> -issuer` — in case Apple has moved past G2 by the time you read this.)
+>
+> A second trap on the way in: the "Add Certificates" dialog defaults to the
+> **iCloud** keychain on a Mac with iCloud Keychain enabled, and importing there
+> fails with `-25294`. It has to be **login**, which is where the private key
+> from the CSR lives — a certificate in one keychain and its key in another
+> forms no identity at all.
+
 Notarization needs an **App Store Connect API key** (Users and Access → Keys →
 `Developer` role). Download the `.p8` once — Apple does not offer it again.
 A key rather than an Apple ID and app-specific password because a key is the
