@@ -21,11 +21,27 @@ say() { echo "signbridge  $*"; }
 
 [ -d "$APP" ] || { echo "signbridge  ERROR  no app at $APP — run build-app.sh first" >&2; exit 1; }
 
-# The host manifest travels INSIDE the bundle and is copied out by the
-# postinstall. Shipping it as a payload file instead would put a second install
-# location in the receipt for something that is really part of the app.
-mkdir -p "$APP/Contents/Resources"
-cp "$REPO/packaging/native-messaging/dev.zicha.signbridge.json" "$APP/Contents/Resources/"
+# NOTHING here may modify the bundle. It has been signed, and possibly stapled,
+# by the time this runs — and the signature seals the whole resource directory,
+# so adding even one file invalidates it. That is not a theoretical concern:
+# this script used to drop the native-messaging manifest into Contents/Resources
+# at exactly this point, and the result notarized as an app, then failed
+# notarization as a pkg with "the signature of the binary is invalid" — a
+# message that names the binary and not the file that was added. The manifest is
+# put in by build-app.sh now, before signing.
+#
+# Checked rather than promised, because the next person to add a line here will
+# not have read this comment.
+if ! codesign --verify --strict "$APP" 2>/dev/null; then
+    if [ -n "${INSTALLER_IDENTITY:-}" ]; then
+        echo "signbridge  ERROR  $APP does not carry a valid signature." >&2
+        codesign --verify --strict --verbose=2 "$APP" || true
+        echo "signbridge         Packaging it would produce an installer that fails" >&2
+        echo "signbridge         notarization, or installs software macOS then refuses to run." >&2
+        exit 1
+    fi
+    say "the app is unsigned — packaging it anyway for a local build."
+fi
 
 rm -rf "$STAGE"
 mkdir -p "$STAGE/Applications"

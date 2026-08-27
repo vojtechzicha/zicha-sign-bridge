@@ -34,6 +34,14 @@ cp "$BIN" "$APP/Contents/MacOS/signbridge-host"
 # build-pkg.sh.)
 xattr -cr "$APP"
 
+# The native-messaging manifest travels inside the bundle, and it goes in HERE,
+# before signing. Adding it afterwards breaks the seal: `_CodeSignature`
+# covers the whole resource directory, so a file appearing in Resources after
+# the fact makes the signature invalid — and the failure surfaces at
+# notarization of whatever CONTAINS the app, as "the signature of the binary is
+# invalid", which points at the binary rather than at the file that was added.
+cp "$REPO/packaging/native-messaging/dev.zicha.signbridge.json" "$APP/Contents/Resources/"
+
 sed -e "s/__VERSION__/$VERSION/g" \
     -e "s/__COPYRIGHT__/Copyright © $(date +%Y) Vojtěch Zicha. MIT licensed./g" \
     "$REPO/packaging/Info.plist" > "$APP/Contents/Info.plist"

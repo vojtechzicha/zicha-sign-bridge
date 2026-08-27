@@ -8,7 +8,20 @@
 # Every check here corresponds to a way this product has failed or could fail
 # silently — installing fine and then not working, which is the expensive shape
 # because it looks like the app's problem, not the helper's.
-set -uo pipefail
+# No `pipefail`, deliberately. Every check here is `something | grep -q …`, and
+# `grep -q` exits the moment it matches — which hands the command upstream a
+# SIGPIPE, which pipefail then reports as a failed pipeline (exit 141). The
+# result is a verifier that fails checks whose pattern appears EARLY in the
+# output while passing the ones that match at the end, on an artifact that is
+# perfectly good. It did exactly that: "signed with a Developer ID" and
+# "hardened runtime is on" both failed against a signed, hardened, notarized
+# app. A verifier that cries wolf on a valid release is worse than no verifier,
+# because the response is to stop believing it.
+#
+# Nothing is lost: `grep -q` on the empty output of a failed command returns 1
+# on its own, so a real failure upstream still fails the check.
+set -uo errexit
+set +o errexit
 
 PKG="${1:?usage: verify-release.sh <pkg> <app>}"
 APP="${2:?usage: verify-release.sh <pkg> <app>}"
