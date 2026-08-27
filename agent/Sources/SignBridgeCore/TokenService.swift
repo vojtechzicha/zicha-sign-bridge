@@ -38,6 +38,11 @@ public final class TokenService: @unchecked Sendable {
         self.init(module: try PKCS11Module(path: modulePath))
     }
 
+    /// Release the card before the process leaves. See `PKCS11Module.finalize()`.
+    public func finalize() {
+        module.finalize()
+    }
+
     public func tokens() throws -> [TokenInfo] {
         try module.usableSlots().compactMap { try? module.tokenInfo(slot: $0) }
     }

@@ -43,9 +43,29 @@ final class LazyTokenService {
         service = created
         return created
     }
+
+    /// Hand the card back, if we ever took it.
+    func release() {
+        service?.finalize()
+        service = nil
+    }
 }
 
 let services = LazyTokenService(modulePath: modulePath)
+
+/// The only way out of this process.
+///
+/// `exit` runs the loaded module's destructors, and SecureStore's joins a
+/// heartbeat thread that C_Finalize — and nothing else — stops. Returning from
+/// `main` does the same thing by another name. So the card is released first
+/// and the process then leaves by `_exit`, which runs no destructor and cannot
+/// be held: a host that lingers here holds the card, and the next connection
+/// finds a reader that is busy for no reason anyone can see.
+@MainActor
+func leave(_ code: Int32) -> Never {
+    services.release()
+    _exit(code)
+}
 let handler = RequestHandler(service: { try services.get() }, consent: DialogConsent())
 let channel = NativeMessaging()
 let decoder = JSONDecoder()
@@ -61,11 +81,11 @@ while true {
         message = try channel.read()
     } catch {
         FileHandle.standardError.write(Data("read failed: \(error)\n".utf8))
-        exit(1)
+        leave(1)
     }
     // End of stream: the browser closed the port, which is the normal way this
     // process ends.
-    guard let message else { break }
+    guard let message else { leave(0) }
 
     let request: Request
     do {
@@ -92,5 +112,5 @@ while true {
             writeFailed = true
         }
     }
-    if writeFailed { exit(1) }
+    if writeFailed { leave(1) }
 }

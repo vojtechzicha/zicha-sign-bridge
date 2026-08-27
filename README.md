@@ -101,3 +101,14 @@ thing anywhere that would notice.
   web app parses subject, validity, key usage and the qualified claim, because
   it already carries an ASN.1 stack and a second implementation here could
   disagree with it.
+
+### Leaving the process
+
+The host exits by `_exit`, never by `exit` and never by returning from `main`, and
+that is not a style choice. SecureStore's dylib registers a destructor that
+joins a heartbeat thread only `C_Finalize` stops; both `exit` and a return from
+`main` run it, so a host that had touched the card hung there forever while
+still holding it — the next connection then found a reader that was busy for no
+visible reason. `signbridge-host` releases the card with
+`PKCS11Module.finalize()` and then leaves by `_exit`, which runs no destructor
+and cannot be held. That ordering is the only exit path in the process.

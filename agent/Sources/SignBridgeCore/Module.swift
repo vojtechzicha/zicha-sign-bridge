@@ -67,6 +67,18 @@ public final class PKCS11Module: @unchecked Sendable {
         dlclose(handle)
     }
 
+    /// Close the module's own view of the reader, without unloading it.
+    ///
+    /// Separate from `deinit` because the two halves cannot both be done on
+    /// the way out: SecureStore's dylib destructor joins a heartbeat thread
+    /// that only C_Finalize stops, so `dlclose` — and `exit`, which runs the
+    /// same destructor — hang forever on a module that is still initialised.
+    /// The host calls this and then leaves by `_exit` (see signbridge-host),
+    /// which is the one ordering that both releases the card and terminates.
+    public func finalize() {
+        _ = functions.C_Finalize?(nil)
+    }
+
     /// Slots holding a token that is actually usable — present, initialised,
     /// and willing to answer C_GetTokenInfo.
     ///
