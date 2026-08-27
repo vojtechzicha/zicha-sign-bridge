@@ -14,3 +14,8 @@ extension/dist/
 *.crx
 *.pem
 !packaging/**/*.pem
+
+# Release artifacts: the app bundle, the pkg and the staging tree that
+# packaging/build-*.sh assemble. Rebuilt from source every time, and the only
+# copies that matter are the ones attached to a GitHub release.
+/build/

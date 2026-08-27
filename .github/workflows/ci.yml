@@ -49,3 +49,16 @@ jobs:
         run: |
           npm ci
           npm run check
+
+  version:
+    # The version lives in four places (see scripts/check-version.mjs). Checked
+    # on every push, not only at release time: a drift introduced today is
+    # cheapest to fix today, and at release time it stops a tag that has already
+    # been pushed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-version.mjs

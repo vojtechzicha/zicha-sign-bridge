@@ -1,0 +1,6 @@
+#!/bin/bash
+# Clear a previous registration before laying down the new one, so a manifest
+# left by an older layout cannot outlive the app it points at.
+set -eu
+find /Library -maxdepth 5 -name 'dev.zicha.signbridge.json' -path '*NativeMessagingHosts*' -delete 2>/dev/null || true
+exit 0

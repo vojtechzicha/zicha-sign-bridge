@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>signbridge-host</string>
+    <key>CFBundleIdentifier</key>
+    <string>dev.zicha.signbridge</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>SignBridge</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>__VERSION__</string>
+    <key>CFBundleVersion</key>
+    <string>__VERSION__</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <!--
+      No Dock icon and no menu bar. Nothing here is ever launched by a person:
+      Chrome spawns the executable over stdio when a paired page asks for a
+      signature, and the only windows are the pairing and PIN dialogs. An app
+      that bounced in the Dock for every signature would be worse than one that
+      does not appear at all.
+    -->
+    <key>LSUIElement</key>
+    <true/>
+    <key>LSBackgroundOnly</key>
+    <false/>
+    <key>NSHumanReadableCopyright</key>
+    <string>__COPYRIGHT__</string>
+</dict>
+</plist>

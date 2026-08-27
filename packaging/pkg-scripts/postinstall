@@ -1,0 +1,40 @@
+#!/bin/bash
+#
+# Register the native messaging host with every Chromium browser on this Mac.
+#
+# System-wide (/Library/...) rather than per-user (~/Library/...), because a
+# .pkg writing into /Applications has already asked for admin — spending it
+# once to register for every account on the machine is strictly better than
+# writing one user's copy and leaving the next login without a helper.
+#
+# The paths are NOT symmetrical and cannot be derived from the browser's name:
+# Google Chrome keeps its system-wide hosts in /Library/Google/Chrome, while
+# Chromium and Brave use /Library/Application Support. Getting one wrong is
+# invisible — the browser simply reports the host as missing.
+set -eu
+
+HOST_NAME="dev.zicha.signbridge"
+MANIFEST="/Applications/SignBridge.app/Contents/Resources/${HOST_NAME}.json"
+
+TARGETS=(
+    "/Library/Google/Chrome/NativeMessagingHosts"
+    "/Library/Google/Chrome Beta/NativeMessagingHosts"
+    "/Library/Google/Chrome Dev/NativeMessagingHosts"
+    "/Library/Google/Chrome Canary/NativeMessagingHosts"
+    "/Library/Microsoft/Edge/NativeMessagingHosts"
+    "/Library/Application Support/Chromium/NativeMessagingHosts"
+    "/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts"
+    "/Library/Application Support/Vivaldi/NativeMessagingHosts"
+)
+
+for dir in "${TARGETS[@]}"; do
+    mkdir -p "$dir"
+    cp "$MANIFEST" "$dir/${HOST_NAME}.json"
+    chmod 644 "$dir/${HOST_NAME}.json"
+done
+
+# Written for every browser, installed or not: a manifest sitting in a directory
+# for a browser nobody has is 300 bytes and no behaviour, whereas installing
+# Brave next week and finding signing silently broken is a support conversation.
+
+exit 0

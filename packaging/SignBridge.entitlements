@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      The one entitlement this product cannot ship without.
+
+      The host dlopens a PKCS #11 module it did not build and Apple did not
+      sign — SecureStore's libICASecureStorePkcs11.dylib, or whatever module a
+      different card ships. Under the hardened runtime, which notarization
+      requires, a process refuses to map any library not signed by the same
+      team unless this is set.
+
+      This is exactly what killed Fortify: macOS terminated it a minute or so
+      after launch, and the app that replaced it exists because of that failure
+      (see docs/pdf-signing-v2.md in the app repository). Removing this line
+      produces a build that installs, launches, answers `hello`, and then dies
+      the moment anyone asks it to look at a card.
+    -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>

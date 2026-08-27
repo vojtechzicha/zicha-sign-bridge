@@ -18,6 +18,35 @@ Design, alternatives considered, and why not a localhost daemon:
 [`docs/sign-bridge-plan.md`](https://github.com/vojtechzicha/toggl-track-quick-view/blob/main/docs/sign-bridge-plan.md)
 in the app repository. The wire format is [`protocol/protocol.md`](protocol/protocol.md).
 
+## Installing
+
+Both halves, or neither: the extension cannot reach a card and the helper
+cannot reach a page.
+
+```bash
+brew tap vojtechzicha/tap
+brew install --cask sign-bridge
+```
+
+or download `SignBridge.pkg` from the
+[latest release](https://github.com/vojtechzicha/zicha-sign-bridge/releases/latest).
+It is signed with a Developer ID and notarized, so it installs without a
+Gatekeeper detour, and stapled, so it installs the same way offline.
+
+Then the extension, from the Chrome Web Store, and **restart your browser** —
+it reads the native-messaging registration at startup.
+
+Requires macOS 13 or later, a Chromium browser (Chrome, Edge, Brave, Vivaldi),
+and your token's PKCS #11 module — for an I.CA card that is
+[SecureStore](https://www.ica.cz/en/secure-store).
+
+### Uninstalling
+
+`brew uninstall --cask sign-bridge`, or `brew uninstall --zap --cask
+sign-bridge` to drop the record of which sites you approved as well. The
+approvals live in one readable file, `~/Library/Application
+Support/SignBridge/paired.json`, which you can also just delete.
+
 ## Security
 
 Four layers, each independent of the others:
@@ -48,7 +77,9 @@ without the confirmation window.
 | `extension/` | MV3 extension — a relay and a gate, no cryptography |
 | `protocol/` | the wire format, which is the contract between the two |
 | `packaging/` | native messaging manifests, entitlements |
-| `scripts/` | `softhsm-token.sh`, `dev-install.sh` |
+| `packaging/` | the app bundle, entitlements, `.pkg`, the Homebrew cask |
+| `scripts/` | `softhsm-token.sh`, `dev-install.sh`, the version and cask tooling |
+| `docs/RELEASING.md` | how a release is cut, and what credentials it needs |
 
 ## Developing
 
